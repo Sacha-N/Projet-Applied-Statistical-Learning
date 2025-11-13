@@ -5,7 +5,8 @@ import pandas as pd
 print(pd.__version__)
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("Liste-des-autorisations-durbanisme-creant-des-logements.2025-10.csv", sep=";",encoding='utf-8')
+df = pd.read_csv("Liste-des-autorisations-durbanisme-creant-des-logements.2025-10.csv", sep=";",
+                 encoding='utf-8', skiprows=1) #j'ai ajouté skip rows sinon tu as la description
 
 print(df.shape)
 print(df.head())
