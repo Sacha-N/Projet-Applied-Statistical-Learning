@@ -4,16 +4,7 @@ import pandas as pd
 # 1. Chargement de Sitadel
 chemin = "data/Liste-des-autorisations-logements-2025-10.csv"
 df = pd.read_csv(chemin, sep=";",encoding='utf-8', 
-                 skiprows=1) #nrows = 1000 pour test
-
-print(df.shape)
-print(df.head())
-df.info()
-
-print("\nColumn names:")
-print(df.columns.tolist())
-
-# 2. Retrait des variables non pertinentes
+                 skiprows=1)
 
 vars_mai2022 = [
     "AN_DEPOT", #"DPC_PREM", (theoriquement il faudrait la retirer, mais bon)
@@ -59,7 +50,20 @@ vars_non_pertinentes = [
 
 
 # 3. Etudions nos dates
+date_cols = ["DATE_REELLE_AUTORISATION", "DATE_REELLE_DOC", "DPC_AUT", "DATE_REELLE_DAACT", "DPC_PREM"]
 
+for col in date_cols:
+    if col in df.columns:
+        print(f"\n{col}:")
+        print(f"  Type: {df[col].dtype}")
+        print(f"  Sample values:")
+        print(df[col].head(10).tolist())
+        print(f"  Null count: {df[col].isna().sum()}")
+    else:
+        print(f"\n{col}: NOT FOUND in dataframe")
+
+
+## Puis, nettoyons le dataset
 def nettoyer_dataset(df: pd.DataFrame):
     df = df.copy()
 
@@ -73,33 +77,65 @@ def nettoyer_dataset(df: pd.DataFrame):
     df.drop(columns=cols_to_drop, inplace=True, errors="ignore")
 
     # ----------------------------------------------------
-    # Conversion des dates en datetime
+    # Conversion des dates en datetime (robuste)
     # ----------------------------------------------------
-    for col in ["DATE_REELLE_AUTORISATION", "DATE_REELLE_DOC", "DPC_AUT", "DATE_REELLE_DAACT", "DPC_PREM"]:
+    # DD/MM/YYYY-like columns: be lenient (dayfirst) and coerce errors
+    dmY_cols = ["DATE_REELLE_AUTORISATION", "DATE_REELLE_DOC", "DATE_REELLE_DAACT"]
+    for col in dmY_cols:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+            df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True, infer_datetime_format=True)
+
+    # YYYY-MM format (year-month only)
+    for col in ["DPC_AUT", "DPC_PREM"]:
+        if col in df.columns:
+            # ensure strings and strip whitespace, coerce bad values
+            df[col] = pd.to_datetime(df[col].astype(str).str.strip(), errors="coerce", format="%Y-%m")
+
+    # Remove unrealistic dates that would cause overflow when converting to ns
+    min_date = pd.Timestamp("1900-01-01") #vérifier cette data / ce format
+    max_date = pd.Timestamp("2025-12-31")
+    for col in dmY_cols + ["DPC_AUT", "DPC_PREM"]:
+        if col in df.columns:
+            mask = (df[col] < min_date) | (df[col] > max_date)
+            df.loc[mask, col] = pd.NaT
 
     # ----------------------------------------------------
-    # 5. Construction des trois cibles
+    # 5. Construction des trois cibles (only where both dates valid)
     # ----------------------------------------------------
     if "DATE_REELLE_AUTORISATION" in df.columns and "DATE_REELLE_DOC" in df.columns:
-        df["delai_ouverture_chantier"] = (
-            df["DATE_REELLE_DOC"] - df["DATE_REELLE_AUTORISATION"]
+        mask = df["DATE_REELLE_AUTORISATION"].notna() & df["DATE_REELLE_DOC"].notna()
+        df.loc[mask, "delai_ouverture_chantier"] = (
+            df.loc[mask, "DATE_REELLE_DOC"] - df.loc[mask, "DATE_REELLE_AUTORISATION"]
         ).dt.days
 
     if "DATE_REELLE_DAACT" in df.columns and "DATE_REELLE_DOC" in df.columns:
-        df["duree_travaux"] = (
-            df["DATE_REELLE_DAACT"] - df["DATE_REELLE_DOC"]
+        mask = df["DATE_REELLE_DAACT"].notna() & df["DATE_REELLE_DOC"].notna()
+        df.loc[mask, "duree_travaux"] = (
+            df.loc[mask, "DATE_REELLE_DAACT"] - df.loc[mask, "DATE_REELLE_DOC"]
         ).dt.days
 
     if "DPC_AUT" in df.columns and "DPC_PREM" in df.columns:
-        df["duree_obtiention_autorisation"] = (
-            df["DPC_PREM"] - df["DPC_AUT"]
+        mask = df["DPC_PREM"].notna() & df["DPC_AUT"].notna()
+        df.loc[mask, "duree_obtiention_autorisation"] = (
+            df.loc[mask, "DPC_PREM"] - df.loc[mask, "DPC_AUT"]
         ).dt.days
 
-    # Suppression des lignes sans cibles
-    df = df.dropna(subset=["delai_ouverture_chantier", "duree_travaux","duree_obtiention_autorisation"], how="all")
+    # Convert durations to numeric and treat non-positive values as missing
+    duration_cols = [
+        "delai_ouverture_chantier",
+        "duree_travaux",
+        "duree_obtiention_autorisation",
+    ]
+    for col in duration_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            # consider zero and negative durations invalid -> set to NA
+            df.loc[df[col] <= 0, col] = pd.NA
 
+    # Suppression des lignes sans cibles valides (NA, null, zero or negative removed above)
+    existing_duration_cols = [c for c in duration_cols if c in df.columns]
+    df = df.dropna(subset=existing_duration_cols, how="all")
+    
     return df
 
 df_clean = nettoyer_dataset(df)
@@ -116,5 +152,6 @@ print("\nAfter cleaning:")
 print("Lines with non-NA delai_ouverture_chantier:", df_clean["delai_ouverture_chantier"].notna().sum())
 print("Lines with non-NA duree_travaux:", df_clean["duree_travaux"].notna().sum())
 print("Lines with non-NA duree_obtiention_autorisation:", df_clean["duree_obtiention_autorisation"].notna().sum())
+print("Lines with non-0 duree_obtiention_autorisation:", (df_clean["duree_obtiention_autorisation"].notna() & (df_clean["duree_obtiention_autorisation"] != 0)).sum())
 print("\nFinal cleaned df shape:", df_clean.shape)
 print("Final cleaned df lines:", len(df_clean))
