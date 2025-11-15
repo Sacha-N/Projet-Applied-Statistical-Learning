@@ -3,7 +3,9 @@ import pandas as pd
 
 # 1. Chargement de Sitadel
 chemin = "data/Liste-des-autorisations-durbanisme-creant-des-logements.2025-10.csv"
-df = pd.read_csv(chemin, sep=";", encoding="utf-8", skiprows=1)
+
+# 1.1 Exclusion ex ante des colonnes non pertinentes
+all_cols = pd.read_csv(chemin, sep=";", nrows=1).columns.tolist()
 
 vars_mai2022 = [
     "AN_DEPOT",  # "DPC_PREM", (theoriquement il faudrait la retirer, mais bon)
@@ -58,6 +60,17 @@ vars_non_pertinentes = [
     "NUM_CADASTRE3",
 ]
 
+cols_to_drop = set(vars_mai2022 + vars_non_pertinentes)
+use_cols = [c for c in all_cols if c not in cols_to_drop]
+
+# 1.2 Chargement avec les colonnes filtrées
+df = pd.read_csv(
+    chemin,
+    sep=";",
+    encoding="utf-8",
+    skiprows=1,
+    usecols=use_cols
+)
 
 # 3. Etudions nos dates
 date_cols = [
