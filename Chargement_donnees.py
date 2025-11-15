@@ -5,7 +5,7 @@ import pandas as pd
 chemin = "data/Liste-des-autorisations-durbanisme-creant-des-logements.2025-10.csv"
 
 # 1.1 Exclusion ex ante des colonnes non pertinentes
-all_cols = pd.read_csv(chemin, sep=";", nrows=1).columns.tolist()
+all_cols = pd.read_csv(chemin, sep=";", skiprows=1, nrows=1).columns.tolist()
 
 vars_mai2022 = [
     "AN_DEPOT",  # "DPC_PREM", (theoriquement il faudrait la retirer, mais bon)
