@@ -3,11 +3,10 @@ import pandas as pd
 
 # 1. Chargement de Sitadel
 chemin = "data/Liste-des-autorisations-durbanisme-creant-des-logements.2025-10.csv"
-df = pd.read_csv(chemin, sep=";",encoding='utf-8', 
-                 skiprows=1)
+df = pd.read_csv(chemin, sep=";", encoding="utf-8", skiprows=1)
 
 vars_mai2022 = [
-    "AN_DEPOT", #"DPC_PREM", (theoriquement il faudrait la retirer, mais bon)
+    "AN_DEPOT",  # "DPC_PREM", (theoriquement il faudrait la retirer, mais bon)
     "NATURE_PROJET_COMPLETEE",
     "DESTINATION_PRINCIPALE",
     "TYPE_PRINCIP_LOGTS_CREES",
@@ -36,21 +35,38 @@ vars_mai2022 = [
     "SURF_IND_TRANSFORMEE",
     "SURF_AGR_TRANSFORMEE",
     "SURF_ENT_TRANSFORMEE",
-    "SURF_PUB_TRANSFORMEE"
+    "SURF_PUB_TRANSFORMEE",
 ]
 vars_non_pertinentes = [
-    "Num_DAU", "SIREN_DEM", "SIRET_DEM", 
-    "DENOM_DEM", "CODPOST_DEM", "LOCALITE_DEM",
-    "ADR_NUM_TER", "ADR_TYPEVOIE_TER", "ADR_LIBVOIE_TER",
-    "ADR_LIEUDIT_TER", "ADR_LOCALITE_TER", "ADR_CODPOST_TER",
-    "SEC_CADASTRE1", "NUM_CADASTRE1",
-    "SEC_CADASTRE2", "NUM_CADASTRE2",
-    "SEC_CADASTRE3", "NUM_CADASTRE3",
+    "Num_DAU",
+    "SIREN_DEM",
+    "SIRET_DEM",
+    "DENOM_DEM",
+    "CODPOST_DEM",
+    "LOCALITE_DEM",
+    "ADR_NUM_TER",
+    "ADR_TYPEVOIE_TER",
+    "ADR_LIBVOIE_TER",
+    "ADR_LIEUDIT_TER",
+    "ADR_LOCALITE_TER",
+    "ADR_CODPOST_TER",
+    "SEC_CADASTRE1",
+    "NUM_CADASTRE1",
+    "SEC_CADASTRE2",
+    "NUM_CADASTRE2",
+    "SEC_CADASTRE3",
+    "NUM_CADASTRE3",
 ]
 
 
 # 3. Etudions nos dates
-date_cols = ["DATE_REELLE_AUTORISATION", "DATE_REELLE_DOC", "DPC_AUT", "DATE_REELLE_DAACT", "DPC_PREM"]
+date_cols = [
+    "DATE_REELLE_AUTORISATION",
+    "DATE_REELLE_DOC",
+    "DPC_AUT",
+    "DATE_REELLE_DAACT",
+    "DPC_PREM",
+]
 
 for col in date_cols:
     if col in df.columns:
@@ -83,16 +99,20 @@ def nettoyer_dataset(df: pd.DataFrame):
     dmY_cols = ["DATE_REELLE_AUTORISATION", "DATE_REELLE_DOC", "DATE_REELLE_DAACT"]
     for col in dmY_cols:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True, infer_datetime_format=True)
+            df[col] = pd.to_datetime(
+                df[col], errors="coerce", dayfirst=True, infer_datetime_format=True
+            )
 
     # YYYY-MM format (year-month only)
     for col in ["DPC_AUT", "DPC_PREM"]:
         if col in df.columns:
             # ensure strings and strip whitespace, coerce bad values
-            df[col] = pd.to_datetime(df[col].astype(str).str.strip(), errors="coerce", format="%Y-%m")
+            df[col] = pd.to_datetime(
+                df[col].astype(str).str.strip(), errors="coerce", format="%Y-%m"
+            )
 
     # Remove unrealistic dates that would cause overflow when converting to ns
-    min_date = pd.Timestamp("1900-01-01") #vérifier cette data / ce format
+    min_date = pd.Timestamp("1900-01-01")  # vérifier cette data / ce format
     max_date = pd.Timestamp("2025-12-31")
     for col in dmY_cols + ["DPC_AUT", "DPC_PREM"]:
         if col in df.columns:
@@ -117,7 +137,7 @@ def nettoyer_dataset(df: pd.DataFrame):
     if "DPC_AUT" in df.columns and "DPC_PREM" in df.columns:
         mask = df["DPC_PREM"].notna() & df["DPC_AUT"].notna()
         df.loc[mask, "duree_obtiention_autorisation"] = (
-            df.loc[mask, "DPC_PREM"] - df.loc[mask, "DPC_AUT"]
+            df.loc[mask, "DPC_AUT"] - df.loc[mask, "DPC_PREM"]
         ).dt.days
 
     # Convert durations to numeric and treat non-positive values as missing
@@ -135,11 +155,12 @@ def nettoyer_dataset(df: pd.DataFrame):
     # Suppression des lignes sans cibles valides (NA, null, zero or negative removed above)
     existing_duration_cols = [c for c in duration_cols if c in df.columns]
     df = df.dropna(subset=existing_duration_cols, how="all")
-    
+
     return df
 
+
 df_clean = nettoyer_dataset(df)
-#df_clean.to_excel("data/output.xlsx", index=False)
+# df_clean.to_excel("data/output.xlsx", index=False)
 df_clean.to_csv("data/output.csv", index=False, sep=";")
 
 ## 4. Comparaison
@@ -149,9 +170,21 @@ print("Total lines in original df:", len(df))
 
 # Statistics after cleaning
 print("\nAfter cleaning:")
-print("Lines with non-NA delai_ouverture_chantier:", df_clean["delai_ouverture_chantier"].notna().sum())
+print(
+    "Lines with non-NA delai_ouverture_chantier:",
+    df_clean["delai_ouverture_chantier"].notna().sum(),
+)
 print("Lines with non-NA duree_travaux:", df_clean["duree_travaux"].notna().sum())
-print("Lines with non-NA duree_obtiention_autorisation:", df_clean["duree_obtiention_autorisation"].notna().sum())
-print("Lines with non-0 duree_obtiention_autorisation:", (df_clean["duree_obtiention_autorisation"].notna() & (df_clean["duree_obtiention_autorisation"] != 0)).sum())
+print(
+    "Lines with non-NA duree_obtiention_autorisation:",
+    df_clean["duree_obtiention_autorisation"].notna().sum(),
+)
+print(
+    "Lines with non-0 duree_obtiention_autorisation:",
+    (
+        df_clean["duree_obtiention_autorisation"].notna()
+        & (df_clean["duree_obtiention_autorisation"] != 0)
+    ).sum(),
+)
 print("\nFinal cleaned df shape:", df_clean.shape)
 print("Final cleaned df lines:", len(df_clean))
