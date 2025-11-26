@@ -14,7 +14,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 ##################################################
 
 # Variables à retirer du jeu de données final
-vars_inutiles_duree_travaux = [
+vars_inutiles_delai_ouverture = [
     "COMM",
     "REG_CODE",
     "REG_LIBELLE",
@@ -30,7 +30,7 @@ vars_inutiles_duree_travaux = [
     "DPC_PREM",
     "DPC_DOC",
     "DPC_DERN", 
-    "delai_ouverture_chantier", 
+    "duree_travaux", 
     "annee_autorisation"]
 
 # Variables à traiter en One-Hot Encoding
@@ -45,7 +45,6 @@ vars_categ = [
     "RES_PRINCIP_OU_SECOND",
     "TYP_ANNEXE",
     "RESIDENCE"]
-
 
 df = pd.read_csv("data/output.csv", sep=";")
 #print(df.head())
@@ -62,15 +61,15 @@ df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
 df = df[df["annee_autorisation"] >= 2020]
 
 # Filtrage des lignes sans la variable cible
-df_filtre_duree_travaux = df.dropna(subset=["duree_travaux"])
+df_filtre_delai_ouverture = df.dropna(subset=["delai_ouverture_chantier"])
 
 # Nettoyage et conversion des types sur l'échantillon
-df_filtre_duree_travaux = df_filtre_duree_travaux.drop(columns=vars_inutiles_duree_travaux, errors="ignore")
-df_filtre_duree_travaux[vars_categ] = df_filtre_duree_travaux[vars_categ].astype("string").fillna("Missing")
+df_filtre_delai_ouverture = df_filtre_delai_ouverture.drop(columns=vars_inutiles_delai_ouverture, errors="ignore")
+df_filtre_delai_ouverture[vars_categ] = df_filtre_delai_ouverture[vars_categ].astype("string").fillna("Missing")
 
 # Définition des variables X et y
-y = df_filtre_duree_travaux["duree_travaux"]
-X = df_filtre_duree_travaux.drop(columns=["duree_travaux"])
+y = df_filtre_delai_ouverture["delai_ouverture_chantier"]
+X = df_filtre_delai_ouverture.drop(columns=["delai_ouverture_chantier"])
 
 # Séparation des colonnes numériques et catégorielles après nettoyage
 num_cols = X.select_dtypes(include=["float", "int"]).columns
@@ -112,8 +111,6 @@ lasso_pipeline.fit(X_train, y_train)
 y_train_pred = lasso_pipeline.predict(X_train)
 y_test_pred = lasso_pipeline.predict(X_test)
 
-train_rmse = mean_squared_error(y_train, y_train_pred, squared=False)
-test_rmse = mean_squared_error(y_test, y_test_pred, squared=False)
 test_rmse = np.sqrt(mean_squared_error(y_test, y_test_pred))
 train_rmse = np.sqrt(mean_squared_error(y_train, y_train_pred))
 
@@ -177,12 +174,12 @@ test_mae_rf  = mean_absolute_error(y_test, y_test_pred_rf)
 train_r2_rf = r2_score(y_train, y_train_pred_rf)
 test_r2_rf  = r2_score(y_test, y_test_pred_rf)
 
-print(f"[Random Forest] RMSE train : {train_rmse_rf:.2f}")
-print(f"[Random Forest] RMSE test  : {test_rmse_rf:.2f}")
-print(f"[Random Forest] MAE train  : {train_mae_rf:.2f}")
-print(f"[Random Forest] MAE test   : {test_mae_rf:.2f}")
-print(f"[Random Forest] R² train   : {train_r2_rf:.3f}")
-print(f"[Random Forest] R² test    : {test_r2_rf:.3f}")
+print(f"RMSE train : {train_rmse_rf:.2f}")
+print(f"RMSE test  : {test_rmse_rf:.2f}")
+print(f"MAE train  : {train_mae_rf:.2f}")
+print(f"MAE test   : {test_mae_rf:.2f}")
+print(f"R² train   : {train_r2_rf:.3f}")
+print(f"R² test    : {test_r2_rf:.3f}")
 
 # Résultats un peu meilleur que le lasso, mais R² pas fou
 
@@ -216,11 +213,13 @@ test_mae_gb  = mean_absolute_error(y_test, y_test_pred_gb)
 train_r2_gb = r2_score(y_train, y_train_pred_gb)
 test_r2_gb  = r2_score(y_test, y_test_pred_gb)
 
-print(f"[Random Forest] RMSE train : {train_rmse_gb:.2f}")
-print(f"[Random Forest] RMSE test  : {test_rmse_gb:.2f}")
-print(f"[Random Forest] MAE train  : {train_mae_gb:.2f}")
-print(f"[Random Forest] MAE test   : {test_mae_gb:.2f}")
-print(f"[Random Forest] R² train   : {train_r2_gb:.3f}")
-print(f"[Random Forest] R² test    : {test_r2_gb:.3f}")
+print(f"RMSE train : {train_rmse_gb:.2f}")
+print(f"RMSE test  : {test_rmse_gb:.2f}")
+print(f"MAE train  : {train_mae_gb:.2f}")
+print(f"MAE test   : {test_mae_gb:.2f}")
+print(f"R² train   : {train_r2_gb:.3f}")
+print(f"R² test    : {test_r2_gb:.3f}")
+
+
 
 
