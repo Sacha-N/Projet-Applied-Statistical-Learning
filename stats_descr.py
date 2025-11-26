@@ -10,6 +10,7 @@ from sklearn.pipeline import Pipeline
 df = pd.read_csv("data/output.csv", sep=";")
 print(df.head())
 print(df.dtypes)
+df.columns
 
 vars_duree = ["duree_travaux", "delai_ouverture_chantier", "duree_obtiention_autorisation"]
 
@@ -38,3 +39,23 @@ plt.show()
 # Tableau des statistiques
 stats = df[vars_duree].agg(["mean", "median", "min", "max"]).T
 print(stats)
+
+# Nombres de permis par années et par régions
+df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
+df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
+df.groupby("annee_autorisation").size()
+
+df.groupby("REG_LIBELLE").size()
+
+# Limitation de la base à la France métropolitaine post 2020 
+
+regions_outremer = [
+    "Guadeloupe", "Martinique", "Guyane",
+    "La Réunion", "Mayotte"
+]
+
+df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
+df = df[df["annee_autorisation"] >= 2020]
+df.size
+
+
