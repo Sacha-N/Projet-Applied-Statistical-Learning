@@ -41,8 +41,7 @@ stats = df[vars_duree].agg(["mean", "median", "min", "max"]).T
 print(stats)
 
 # Nombres de permis par années et par régions
-df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
-df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
+
 df.groupby("annee_autorisation").size()
 
 df.groupby("REG_LIBELLE").size()
@@ -53,7 +52,8 @@ regions_outremer = [
     "Guadeloupe", "Martinique", "Guyane",
     "La Réunion", "Mayotte"
 ]
-
+df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
+df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
 df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
 df = df[df["annee_autorisation"] >= 2020]
 df.size

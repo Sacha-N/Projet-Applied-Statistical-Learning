@@ -28,7 +28,8 @@ vars_inutiles_duree_travaux = [
     "DPC_PREM",
     "DPC_DOC",
     "DPC_DERN", 
-    "delai_ouverture_chantier"]
+    "delai_ouverture_chantier", 
+    "annee_autorisation"]
 
 # Variables à traiter en One-Hot Encoding
 vars_categ = [
@@ -47,6 +48,16 @@ vars_categ = [
 df = pd.read_csv("data/output.csv", sep=";")
 #print(df.head())
 #df.columns
+
+# Filtrage des régions et des années
+regions_outremer = [
+    "Guadeloupe", "Martinique", "Guyane",
+    "La Réunion", "Mayotte"
+]
+df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
+df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
+df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
+df = df[df["annee_autorisation"] >= 2020]
 
 # Filtrage des lignes sans la variable cible
 df_filtre_duree_travaux = df.dropna(subset=["duree_travaux"])
@@ -102,7 +113,7 @@ lasso_pipeline.fit(X_train, y_train)
 y_train_pred = lasso_pipeline.predict(X_train)
 y_test_pred = lasso_pipeline.predict(X_test)
 
-# --- 4. Erreurs ------
+# Erreurs
 
 train_rmse = mean_squared_error(y_train, y_train_pred, squared=False)
 test_rmse = mean_squared_error(y_test, y_test_pred, squared=False)
@@ -135,4 +146,48 @@ nonzero_idx = coefs != 0
 selected_features = [(name, coef) for name, coef in zip(feature_names, coefs) if coef != 0]
 for name, coef in selected_features:
     print(f"{name}: {coef:.4f}")
+
+
+# --- 4. Random forest ------
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+rf_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", RandomForestRegressor(
+        max_depth=12, 
+        min_samples_split=10,
+        min_samples_leaf=4,
+        n_estimators=200,
+        n_jobs=-1,
+        random_state=42
+    ))
+]) #On peut modifier la profondeur peut être pour améliorer les résultats 
+
+rf_pipeline.fit(X_train, y_train)
+
+y_train_pred_rf = rf_pipeline.predict(X_train)
+y_test_pred_rf  = rf_pipeline.predict(X_test)
+
+train_rmse_rf = np.sqrt(mean_squared_error(y_train, y_train_pred_rf))
+test_rmse_rf  = np.sqrt(mean_squared_error(y_test, y_test_pred_rf))
+
+train_mae_rf = mean_absolute_error(y_train, y_train_pred_rf)
+test_mae_rf  = mean_absolute_error(y_test, y_test_pred_rf)
+
+train_r2_rf = r2_score(y_train, y_train_pred_rf)
+test_r2_rf  = r2_score(y_test, y_test_pred_rf)
+
+print(f"[Random Forest] RMSE train : {train_rmse_rf:.2f}")
+print(f"[Random Forest] RMSE test  : {test_rmse_rf:.2f}")
+print(f"[Random Forest] MAE train  : {train_mae_rf:.2f}")
+print(f"[Random Forest] MAE test   : {test_mae_rf:.2f}")
+print(f"[Random Forest] R² train   : {train_r2_rf:.3f}")
+print(f"[Random Forest] R² test    : {test_r2_rf:.3f}")
+
+# Résultats un peu meilleur que le lasso, mais R² pas fou
+
+
+
 
