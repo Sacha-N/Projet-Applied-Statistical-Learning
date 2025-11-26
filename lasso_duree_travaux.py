@@ -9,7 +9,9 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Lasso
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
+##################################################
 # --- 1. Préparation des Données et Variables ---
+##################################################
 
 # Variables à retirer du jeu de données final
 vars_inutiles_duree_travaux = [
@@ -74,8 +76,9 @@ X = df_filtre_duree_travaux.drop(columns=["duree_travaux"])
 num_cols = X.select_dtypes(include=["float", "int"]).columns
 cat_cols = X.select_dtypes(include=["string"]).columns
 
-
+#####################################################
 # --- 2. Création du Pipeline de Pré-traitement -----
+#####################################################
 
 preprocess = ColumnTransformer(
     transformers=[
@@ -87,18 +90,15 @@ preprocess = ColumnTransformer(
     remainder='passthrough' # Ne rien faire avec les colonnes restantes
 )
 
-# --- 3. Modèle LASSO ---
-
-# LassoCV : Recherche automatique du meilleur alpha via Cross-Validation (cv=5)
-# n_jobs=-1 : Utilise tous les cœurs du processeur pour accélérer la Cross-Validation
-# solver='saga' : Solveur plus adapté aux matrices de données larges et creuses issues du One-Hot Encoding
-# max_iter=50000 : Augmente le nombre maximum d'itérations pour garantir la convergence
-
 X_train, X_test, y_train, y_test = train_test_split(
     X, y,
     test_size=0.2,
     random_state=42
 )
+
+#########################
+# --- 3. Modèle LASSO ---
+#########################
 
 lasso = Lasso(alpha=0.1, max_iter=10000)
 
@@ -109,11 +109,8 @@ lasso_pipeline = Pipeline(steps=[
 
 lasso_pipeline.fit(X_train, y_train)
 
-# Prédictions
 y_train_pred = lasso_pipeline.predict(X_train)
 y_test_pred = lasso_pipeline.predict(X_test)
-
-# Erreurs
 
 train_rmse = mean_squared_error(y_train, y_train_pred, squared=False)
 test_rmse = mean_squared_error(y_test, y_test_pred, squared=False)
@@ -147,8 +144,9 @@ selected_features = [(name, coef) for name, coef in zip(feature_names, coefs) if
 for name, coef in selected_features:
     print(f"{name}: {coef:.4f}")
 
-
+#############################
 # --- 4. Random forest ------
+#############################
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -188,6 +186,41 @@ print(f"[Random Forest] R² test    : {test_r2_rf:.3f}")
 
 # Résultats un peu meilleur que le lasso, mais R² pas fou
 
+#################################
+# --- 5. Grandient Boosting -----
+#################################
 
+from sklearn.ensemble import GradientBoostingRegressor
+
+gb_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", GradientBoostingRegressor(
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=3,
+        random_state=42
+    ))
+])
+
+gb_pipeline.fit(X_train, y_train)
+
+y_train_pred_gb = gb_pipeline.predict(X_train)
+y_test_pred_gb  = gb_pipeline.predict(X_test)
+
+train_rmse_gb = np.sqrt(mean_squared_error(y_train, y_train_pred_gb))
+test_rmse_gb  = np.sqrt(mean_squared_error(y_test, y_test_pred_gb))
+
+train_mae_gb = mean_absolute_error(y_train, y_train_pred_gb)
+test_mae_gb  = mean_absolute_error(y_test, y_test_pred_gb)
+
+train_r2_gb = r2_score(y_train, y_train_pred_gb)
+test_r2_gb  = r2_score(y_test, y_test_pred_gb)
+
+print(f"[Random Forest] RMSE train : {train_rmse_gb:.2f}")
+print(f"[Random Forest] RMSE test  : {test_rmse_gb:.2f}")
+print(f"[Random Forest] MAE train  : {train_mae_gb:.2f}")
+print(f"[Random Forest] MAE test   : {test_mae_gb:.2f}")
+print(f"[Random Forest] R² train   : {train_r2_gb:.3f}")
+print(f"[Random Forest] R² test    : {test_r2_gb:.3f}")
 
 
