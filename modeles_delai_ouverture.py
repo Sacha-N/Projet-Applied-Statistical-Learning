@@ -220,6 +220,70 @@ print(f"MAE test   : {test_mae_gb:.2f}")
 print(f"R² train   : {train_r2_gb:.3f}")
 print(f"R² test    : {test_r2_gb:.3f}")
 
+##########################
+# --- 6. KNN Regressor ---
+##########################
 
+# Beaucoup trop lent sur la taille de notre base 
 
+from sklearn.neighbors import KNeighborsRegressor
+
+knn_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", KNeighborsRegressor(n_neighbors=10))
+])
+
+knn_pipeline.fit(X_train, y_train)
+
+y_train_pred_knn = knn_pipeline.predict(X_train)
+y_test_pred_knn  = knn_pipeline.predict(X_test)
+
+train_rmse_knn = np.sqrt(mean_squared_error(y_train, y_train_pred_knn))
+test_rmse_knn  = np.sqrt(mean_squared_error(y_test, y_test_pred_knn))
+
+train_mae_knn = mean_absolute_error(y_train, y_train_pred_knn)
+test_mae_knn  = mean_absolute_error(y_test, y_test_pred_knn)
+
+train_r2_knn = r2_score(y_train, y_train_pred_knn)
+test_r2_knn  = r2_score(y_test, y_test_pred_knn)
+
+print(f"RMSE train : {train_rmse_knn:.2f}")
+print(f"RMSE test  : {test_rmse_knn:.2f}")
+print(f"MAE train  : {train_mae_knn:.2f}")
+print(f"MAE test   : {test_mae_knn:.2f}")
+print(f"R² train   : {train_r2_knn:.3f}")
+print(f"R² test    : {test_r2_knn:.3f}")
+
+####################
+# --- 7. SVM/SVR ---
+####################
+
+from sklearn.svm import SVR
+from sklearn.svm import LinearSVR
+
+svr_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", LinearSVR(C=1.0, epsilon=1.0, random_state=0))
+])
+
+svr_pipeline.fit(X_train, y_train)
+
+y_train_pred_svr = svr_pipeline.predict(X_train)
+y_test_pred_svr  = svr_pipeline.predict(X_test)
+
+train_rmse_svr = np.sqrt(mean_squared_error(y_train, y_train_pred_svr))
+test_rmse_svr  = np.sqrt(mean_squared_error(y_test, y_test_pred_svr))
+
+train_mae_svr = mean_absolute_error(y_train, y_train_pred_svr)
+test_mae_svr  = mean_absolute_error(y_test, y_test_pred_svr)
+
+train_r2_svr = r2_score(y_train, y_train_pred_svr)
+test_r2_svr  = r2_score(y_test, y_test_pred_svr)
+
+print(f"RMSE train : {train_rmse_svr:.2f}")
+print(f"RMSE test  : {test_rmse_svr:.2f}")
+print(f"MAE train  : {train_mae_svr:.2f}")
+print(f"MAE test   : {test_mae_svr:.2f}")
+print(f"R² train   : {train_r2_svr:.3f}")
+print(f"R² test    : {test_r2_svr:.3f}")
 
