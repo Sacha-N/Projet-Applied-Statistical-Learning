@@ -34,10 +34,11 @@ for i, col in enumerate(vars_duree, 1):
 
 plt.tight_layout()
 plt.show()
+plt.savefig("figure.png", dpi=150)
 
 
 # Tableau des statistiques
-stats = df[vars_duree].agg(["mean", "median", "min", "max"]).T
+stats = df.groupby("annee_autorisation")["delai_ouverture_chantier"].agg(["mean", "median", "min", "max"])
 print(stats)
 
 # Nombres de permis par années et par régions

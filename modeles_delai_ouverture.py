@@ -30,8 +30,7 @@ vars_inutiles_delai_ouverture = [
     "DPC_PREM",
     "DPC_DOC",
     "DPC_DERN", 
-    "duree_travaux", 
-    "annee_autorisation"]
+    "duree_travaux"]
 
 # Variables à traiter en One-Hot Encoding
 vars_categ = [
@@ -58,7 +57,9 @@ regions_outremer = [
 df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
 df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
 df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
-df = df[df["annee_autorisation"] >= 2020]
+#df = df[df["annee_autorisation"] >= 2020]
+df = df[(df["annee_autorisation"] >= 2015) & (df["annee_autorisation"] <= 2019)]
+df = df[df["delai_ouverture_chantier"] <= 600]
 
 # Filtrage des lignes sans la variable cible
 df_filtre_delai_ouverture = df.dropna(subset=["delai_ouverture_chantier"])
@@ -127,6 +128,9 @@ print(f"MAE test   : {test_mae:.2f}")
 print(f"R² train   : {train_r2:.3f}")
 print(f"R² test    : {test_r2:.3f}")
 
+print('Classification accuracy on test is: {}'.format(lasso_pipeline.score(X_test, y_test)))
+
+
 # résultats pas fous mais positif que train et test soient similaires 
 
 coefs = lasso_pipeline.named_steps["model"].coef_
@@ -180,6 +184,9 @@ print(f"MAE train  : {train_mae_rf:.2f}")
 print(f"MAE test   : {test_mae_rf:.2f}")
 print(f"R² train   : {train_r2_rf:.3f}")
 print(f"R² test    : {test_r2_rf:.3f}")
+
+print('Classification accuracy on test is: {}'.format(rf_pipeline.score(X_test, y_test)))
+
 
 # Résultats un peu meilleur que le lasso, mais R² pas fou
 
@@ -286,4 +293,135 @@ print(f"MAE train  : {train_mae_svr:.2f}")
 print(f"MAE test   : {test_mae_svr:.2f}")
 print(f"R² train   : {train_r2_svr:.3f}")
 print(f"R² test    : {test_r2_svr:.3f}")
+
+#print('Returned hyperparameter: {}'.format(svr_pipeline.best_params_))
+#print('Best classification accuracy in train is: {}'.format(svr_pipeline.best_score_))
+print('Classification accuracy on test is: {}'.format(svr_pipeline.score(X_test, y_test)))
+
+################################
+# --- 8. SVR Validation croisée
+################################
+
+import numpy as np
+from sklearn.svm import LinearSVR
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# 1. Pipeline de base (tu gardes ton preprocess tel quel)
+svr_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", LinearSVR(random_state=0, max_iter=5000))
+])
+
+# 2. Espace d'hyperparamètres à explorer
+param_distributions = {
+    "model__C": np.logspace(-3, 3, 7, base=10),       # [1e-3, 1e-2, ..., 1e3]
+    "model__epsilon": np.logspace(-3, 1, 5, base=10)  # [1e-3, 1e-2, 1e-1, 1, 10]
+}
+
+# 3. Validation croisée + recherche aléatoire
+svr_search = RandomizedSearchCV(
+    estimator=svr_pipeline,
+    param_distributions=param_distributions,
+    n_iter=15,                          # nombre de combinaisons testées
+    cv=3,                               # 3-fold CV
+    scoring="neg_root_mean_squared_error",  # on optimise le RMSE
+    n_jobs=-1,                          # parallèle si possible
+    random_state=0,
+    verbose=1
+)
+
+# 4. Entraînement avec CV
+svr_search.fit(X_train, y_train)
+
+print("Meilleurs hyperparamètres :", svr_search.best_params_)
+print("Meilleur score CV (RMSE négatif) :", svr_search.best_score_)
+print('Classification accuracy on test is: {}'.format(svr_search.score(X_test, y_test)))
+
+# 5. Re-prédictions avec le meilleur modèle trouvé
+best_svr_pipeline = svr_search.best_estimator_
+
+y_train_pred_svr = best_svr_pipeline.predict(X_train)
+y_test_pred_svr  = best_svr_pipeline.predict(X_test)
+
+# 6. Évaluation détaillée
+train_rmse = np.sqrt(mean_squared_error(y_train, y_train_pred_svr))
+test_rmse  = np.sqrt(mean_squared_error(y_test,  y_test_pred_svr))
+
+train_mae = mean_absolute_error(y_train, y_train_pred_svr)
+test_mae  = mean_absolute_error(y_test,  y_test_pred_svr)
+
+train_r2 = r2_score(y_train, y_train_pred_svr)
+test_r2  = r2_score(y_test,  y_test_pred_svr)
+
+print(f"RMSE train : {train_rmse:.2f}")
+print(f"RMSE test  : {test_rmse:.2f}")
+print(f"MAE train  : {train_mae:.2f}")
+print(f"MAE test   : {test_mae:.2f}")
+print(f"R² train   : {train_r2:.3f}")
+print(f"R² test    : {test_r2:.3f}")
+
+#######################################
+# --- 9. Lasso et cross validation ---
+#######################################
+
+import numpy as np
+from sklearn.linear_model import Lasso
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# 1. Pipeline de base
+lasso = Lasso(max_iter=10000)  # on ne fixe plus alpha ici
+
+lasso_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", lasso)
+])
+
+# 2. Grille de valeurs pour alpha (régularisation)
+alpha_grid = np.logspace(-4, 1, 6)  # [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]
+
+param_grid = {
+    "model__alpha": alpha_grid
+}
+
+# 3. Validation croisée + grid search
+lasso_search = GridSearchCV(
+    estimator=lasso_pipeline,
+    param_grid=param_grid,
+    cv=5,   # 5-fold CV, ça reste très raisonnable pour un Lasso
+    scoring="neg_root_mean_squared_error",  # on optimise le RMSE
+    n_jobs=-1
+)
+
+# 4. Entraînement avec CV
+lasso_search.fit(X_train, y_train)
+
+print("Meilleur alpha :", lasso_search.best_params_)
+print("Meilleur score CV (RMSE négatif) :", lasso_search.best_score_)
+
+# 5. Modèle final (meilleur pipeline trouvé)
+best_lasso_pipeline = lasso_search.best_estimator_
+
+y_train_pred_lasso = best_lasso_pipeline.predict(X_train)
+y_test_pred_lasso  = best_lasso_pipeline.predict(X_test)
+
+# 6. Évaluation
+train_rmse = mean_squared_error(y_train, y_train_pred_lasso, squared=False)
+test_rmse  = mean_squared_error(y_test,  y_test_pred_lasso,  squared=False)
+
+train_mae = mean_absolute_error(y_train, y_train_pred_lasso)
+test_mae  = mean_absolute_error(y_test,  y_test_pred_lasso)
+
+train_r2 = r2_score(y_train, y_train_pred_lasso)
+test_r2  = r2_score(y_test,  y_test_pred_lasso)
+
+print(f"RMSE train : {train_rmse:.2f}")
+print(f"RMSE test  : {test_rmse:.2f}")
+print(f"MAE train  : {train_mae:.2f}")
+print(f"MAE test   : {test_mae:.2f}")
+print(f"R² train   : {train_r2:.3f}")
+print(f"R² test    : {test_r2:.3f}")
 
