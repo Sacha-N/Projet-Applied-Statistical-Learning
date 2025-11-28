@@ -250,7 +250,7 @@ from sklearn.neural_network import MLPRegressor
  #       n_iter_no_change=10,
  #       random_state=42
  #   ))
-#])
+#]) Version trop longue à tourner 
 
 
 mlp_pipeline = Pipeline(steps=[
@@ -332,6 +332,11 @@ print(f"R² test    : {test_r2_svr:.3f}")
 #print('Returned hyperparameter: {}'.format(svr_pipeline.best_params_))
 #print('Best classification accuracy in train is: {}'.format(svr_pipeline.best_score_))
 print('Classification accuracy on test is: {}'.format(svr_pipeline.score(X_test, y_test)))
+
+
+#########################################################################
+# ----------------------- POUBELLE -------------------------------------
+#########################################################################
 
 ################################
 # --- 8. SVR Validation croisée
