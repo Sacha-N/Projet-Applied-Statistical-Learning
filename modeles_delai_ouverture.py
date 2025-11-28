@@ -16,7 +16,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 # Variables à retirer du jeu de données final
 vars_inutiles_delai_ouverture = [
     "COMM",
-    "REG_CODE",
+    "DEP_CODE",
     "REG_LIBELLE",
     "DEP_LIBELLE",
     "NUM_DAU",
@@ -34,7 +34,7 @@ vars_inutiles_delai_ouverture = [
 
 # Variables à traiter en One-Hot Encoding
 vars_categ = [
-    "DEP_CODE",
+    "REG_CODE",
     "TYPE_DAU",
     "ETAT_DAU",
     "CAT_DEM",
@@ -56,24 +56,26 @@ regions_outremer = [
 ]
 df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
 df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
-df = df[~df["REG_LIBELLE"].isin(regions_outremer)]
-#df = df[df["annee_autorisation"] >= 2020]
-df = df[(df["annee_autorisation"] >= 2015) & (df["annee_autorisation"] <= 2019)]
-df = df[df["delai_ouverture_chantier"] <= 600]
 
 # Filtrage des lignes sans la variable cible
 df_filtre_delai_ouverture = df.dropna(subset=["delai_ouverture_chantier"])
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[~df["REG_LIBELLE"].isin(regions_outremer)]
+#df = df[df["annee_autorisation"] >= 2020]
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[(df_filtre_delai_ouverture["annee_autorisation"] >= 2015) & (df_filtre_delai_ouverture["annee_autorisation"] <= 2019)]
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[df_filtre_delai_ouverture["delai_ouverture_chantier"] <= 600]
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[df_filtre_delai_ouverture["ETAT_DAU"] != 4]
 
 # Nettoyage et conversion des types sur l'échantillon
 df_filtre_delai_ouverture = df_filtre_delai_ouverture.drop(columns=vars_inutiles_delai_ouverture, errors="ignore")
 df_filtre_delai_ouverture[vars_categ] = df_filtre_delai_ouverture[vars_categ].astype("string").fillna("Missing")
+#df_filtre_delai_ouverture.isna().any().any() Pas de NA
 
 # Définition des variables X et y
 y = df_filtre_delai_ouverture["delai_ouverture_chantier"]
 X = df_filtre_delai_ouverture.drop(columns=["delai_ouverture_chantier"])
 
 # Séparation des colonnes numériques et catégorielles après nettoyage
-num_cols = X.select_dtypes(include=["float", "int"]).columns
+num_cols = X.select_dtypes(include=["float", "int", "bool"]).columns
 cat_cols = X.select_dtypes(include=["string"]).columns
 
 #####################################################
@@ -130,9 +132,9 @@ print(f"R² test    : {test_r2:.3f}")
 
 print('Classification accuracy on test is: {}'.format(lasso_pipeline.score(X_test, y_test)))
 
-
 # résultats pas fous mais positif que train et test soient similaires 
 
+# Nombre de coefs non nuls
 coefs = lasso_pipeline.named_steps["model"].coef_
 nb_nonzero = np.sum(coefs != 0)
 print("Nombre de coefficients non nuls :", nb_nonzero)
@@ -227,39 +229,72 @@ print(f"MAE test   : {test_mae_gb:.2f}")
 print(f"R² train   : {train_r2_gb:.3f}")
 print(f"R² test    : {test_r2_gb:.3f}")
 
-##########################
-# --- 6. KNN Regressor ---
-##########################
+#Résultats meilleurs que Random forest (sans dépasser le 0,2 de R²)
 
-# Beaucoup trop lent sur la taille de notre base 
+##################################
+# --- 6. Réseaux de neurones ---
+##################################
 
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neural_network import MLPRegressor
 
-knn_pipeline = Pipeline(steps=[
+#mlp_pipeline = Pipeline(steps=[
+#    ("preprocess", preprocess),
+#    ("model", MLPRegressor(
+#        hidden_layer_sizes=(64, 32),
+#        activation="relu",
+#        solver="adam",
+ #       alpha=1e-4,            # régularisation L2
+ #       learning_rate="adaptive",
+ #       max_iter=200,
+ #       early_stopping=True,   # validation interne pour stopper avant
+ #       n_iter_no_change=10,
+ #       random_state=42
+ #   ))
+#])
+
+
+mlp_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
-    ("model", KNeighborsRegressor(n_neighbors=10))
+    ("model", MLPRegressor(
+        hidden_layer_sizes=(32, 16),   # plus petit réseau
+        activation="relu",
+        solver="adam",
+        alpha=1e-4,
+        learning_rate="adaptive",
+        learning_rate_init=0.001,
+        batch_size=256,               # mini-batch => plus rapide
+        max_iter=50,                  # peu d’epochs + early stopping
+        early_stopping=True,
+        n_iter_no_change=5,
+        tol=1e-3,
+        random_state=42
+    ))
 ])
 
-knn_pipeline.fit(X_train, y_train)
 
-y_train_pred_knn = knn_pipeline.predict(X_train)
-y_test_pred_knn  = knn_pipeline.predict(X_test)
+mlp_pipeline.fit(X_train, y_train)
 
-train_rmse_knn = np.sqrt(mean_squared_error(y_train, y_train_pred_knn))
-test_rmse_knn  = np.sqrt(mean_squared_error(y_test, y_test_pred_knn))
+# Prédictions
+y_train_pred_mlp = mlp_pipeline.predict(X_train)
+y_test_pred_mlp  = mlp_pipeline.predict(X_test)
 
-train_mae_knn = mean_absolute_error(y_train, y_train_pred_knn)
-test_mae_knn  = mean_absolute_error(y_test, y_test_pred_knn)
+# Métriques
+train_rmse_mlp = np.sqrt(mean_squared_error(y_train, y_train_pred_mlp))
+test_rmse_mlp  = np.sqrt(mean_squared_error(y_test, y_test_pred_mlp))
 
-train_r2_knn = r2_score(y_train, y_train_pred_knn)
-test_r2_knn  = r2_score(y_test, y_test_pred_knn)
+train_mae_mlp = mean_absolute_error(y_train, y_train_pred_mlp)
+test_mae_mlp  = mean_absolute_error(y_test, y_test_pred_mlp)
 
-print(f"RMSE train : {train_rmse_knn:.2f}")
-print(f"RMSE test  : {test_rmse_knn:.2f}")
-print(f"MAE train  : {train_mae_knn:.2f}")
-print(f"MAE test   : {test_mae_knn:.2f}")
-print(f"R² train   : {train_r2_knn:.3f}")
-print(f"R² test    : {test_r2_knn:.3f}")
+train_r2_mlp = r2_score(y_train, y_train_pred_mlp)
+test_r2_mlp  = r2_score(y_test, y_test_pred_mlp)
+
+print(f"[MLP] RMSE train : {train_rmse_mlp:.2f}")
+print(f"[MLP] RMSE test  : {test_rmse_mlp:.2f}")
+print(f"[MLP] MAE train  : {train_mae_mlp:.2f}")
+print(f"[MLP] MAE test   : {test_mae_mlp:.2f}")
+print(f"[MLP] R² train   : {train_r2_mlp:.3f}")
+print(f"[MLP] R² test    : {test_r2_mlp:.3f}")
+
 
 ####################
 # --- 7. SVM/SVR ---
@@ -425,68 +460,37 @@ print(f"MAE test   : {test_mae:.2f}")
 print(f"R² train   : {train_r2:.3f}")
 print(f"R² test    : {test_r2:.3f}")
 
+##########################
+# --- 10. KNN Regressor ---
+##########################
 
-##################################
-# --- 10. Réseaux de neurones ---
-##################################
+# Beaucoup trop lent sur la taille de notre base 
 
-from sklearn.neural_network import MLPRegressor
+from sklearn.neighbors import KNeighborsRegressor
 
-#mlp_pipeline = Pipeline(steps=[
-#    ("preprocess", preprocess),
-#    ("model", MLPRegressor(
-#        hidden_layer_sizes=(64, 32),
-#        activation="relu",
-#        solver="adam",
- #       alpha=1e-4,            # régularisation L2
- #       learning_rate="adaptive",
- #       max_iter=200,
- #       early_stopping=True,   # validation interne pour stopper avant
- #       n_iter_no_change=10,
- #       random_state=42
- #   ))
-#])
-
-
-mlp_pipeline = Pipeline(steps=[
+knn_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
-    ("model", MLPRegressor(
-        hidden_layer_sizes=(32, 16),   # plus petit réseau
-        activation="relu",
-        solver="adam",
-        alpha=1e-4,
-        learning_rate="adaptive",
-        learning_rate_init=0.001,
-        batch_size=256,               # mini-batch => plus rapide
-        max_iter=50,                  # peu d’epochs + early stopping
-        early_stopping=True,
-        n_iter_no_change=5,
-        tol=1e-3,
-        random_state=42
-    ))
+    ("model", KNeighborsRegressor(n_neighbors=10))
 ])
 
+knn_pipeline.fit(X_train, y_train)
 
-mlp_pipeline.fit(X_train, y_train)
+y_train_pred_knn = knn_pipeline.predict(X_train)
+y_test_pred_knn  = knn_pipeline.predict(X_test)
 
-# Prédictions
-y_train_pred_mlp = mlp_pipeline.predict(X_train)
-y_test_pred_mlp  = mlp_pipeline.predict(X_test)
+train_rmse_knn = np.sqrt(mean_squared_error(y_train, y_train_pred_knn))
+test_rmse_knn  = np.sqrt(mean_squared_error(y_test, y_test_pred_knn))
 
-# Métriques
-train_rmse_mlp = np.sqrt(mean_squared_error(y_train, y_train_pred_mlp))
-test_rmse_mlp  = np.sqrt(mean_squared_error(y_test, y_test_pred_mlp))
+train_mae_knn = mean_absolute_error(y_train, y_train_pred_knn)
+test_mae_knn  = mean_absolute_error(y_test, y_test_pred_knn)
 
-train_mae_mlp = mean_absolute_error(y_train, y_train_pred_mlp)
-test_mae_mlp  = mean_absolute_error(y_test, y_test_pred_mlp)
+train_r2_knn = r2_score(y_train, y_train_pred_knn)
+test_r2_knn  = r2_score(y_test, y_test_pred_knn)
 
-train_r2_mlp = r2_score(y_train, y_train_pred_mlp)
-test_r2_mlp  = r2_score(y_test, y_test_pred_mlp)
-
-print(f"[MLP] RMSE train : {train_rmse_mlp:.2f}")
-print(f"[MLP] RMSE test  : {test_rmse_mlp:.2f}")
-print(f"[MLP] MAE train  : {train_mae_mlp:.2f}")
-print(f"[MLP] MAE test   : {test_mae_mlp:.2f}")
-print(f"[MLP] R² train   : {train_r2_mlp:.3f}")
-print(f"[MLP] R² test    : {test_r2_mlp:.3f}")
+print(f"RMSE train : {train_rmse_knn:.2f}")
+print(f"RMSE test  : {test_rmse_knn:.2f}")
+print(f"MAE train  : {train_mae_knn:.2f}")
+print(f"MAE test   : {test_mae_knn:.2f}")
+print(f"R² train   : {train_r2_knn:.3f}")
+print(f"R² test    : {test_r2_knn:.3f}")
 
