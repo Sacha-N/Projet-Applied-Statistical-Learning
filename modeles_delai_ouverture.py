@@ -425,3 +425,68 @@ print(f"MAE test   : {test_mae:.2f}")
 print(f"R² train   : {train_r2:.3f}")
 print(f"R² test    : {test_r2:.3f}")
 
+
+##################################
+# --- 10. Réseaux de neurones ---
+##################################
+
+from sklearn.neural_network import MLPRegressor
+
+#mlp_pipeline = Pipeline(steps=[
+#    ("preprocess", preprocess),
+#    ("model", MLPRegressor(
+#        hidden_layer_sizes=(64, 32),
+#        activation="relu",
+#        solver="adam",
+ #       alpha=1e-4,            # régularisation L2
+ #       learning_rate="adaptive",
+ #       max_iter=200,
+ #       early_stopping=True,   # validation interne pour stopper avant
+ #       n_iter_no_change=10,
+ #       random_state=42
+ #   ))
+#])
+
+
+mlp_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", MLPRegressor(
+        hidden_layer_sizes=(32, 16),   # plus petit réseau
+        activation="relu",
+        solver="adam",
+        alpha=1e-4,
+        learning_rate="adaptive",
+        learning_rate_init=0.001,
+        batch_size=256,               # mini-batch => plus rapide
+        max_iter=50,                  # peu d’epochs + early stopping
+        early_stopping=True,
+        n_iter_no_change=5,
+        tol=1e-3,
+        random_state=42
+    ))
+])
+
+
+mlp_pipeline.fit(X_train, y_train)
+
+# Prédictions
+y_train_pred_mlp = mlp_pipeline.predict(X_train)
+y_test_pred_mlp  = mlp_pipeline.predict(X_test)
+
+# Métriques
+train_rmse_mlp = np.sqrt(mean_squared_error(y_train, y_train_pred_mlp))
+test_rmse_mlp  = np.sqrt(mean_squared_error(y_test, y_test_pred_mlp))
+
+train_mae_mlp = mean_absolute_error(y_train, y_train_pred_mlp)
+test_mae_mlp  = mean_absolute_error(y_test, y_test_pred_mlp)
+
+train_r2_mlp = r2_score(y_train, y_train_pred_mlp)
+test_r2_mlp  = r2_score(y_test, y_test_pred_mlp)
+
+print(f"[MLP] RMSE train : {train_rmse_mlp:.2f}")
+print(f"[MLP] RMSE test  : {test_rmse_mlp:.2f}")
+print(f"[MLP] MAE train  : {train_mae_mlp:.2f}")
+print(f"[MLP] MAE test   : {test_mae_mlp:.2f}")
+print(f"[MLP] R² train   : {train_r2_mlp:.3f}")
+print(f"[MLP] R² test    : {test_r2_mlp:.3f}")
+
