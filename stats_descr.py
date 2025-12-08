@@ -2,10 +2,6 @@
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.linear_model import LassoCV
-from sklearn.pipeline import Pipeline
 
 df = pd.read_csv("data/output.csv", sep=";")
 print(df.head())

@@ -1,12 +1,21 @@
-import pandas as pd
+# Core
 import numpy as np
-from sklearn.model_selection import train_test_split
+import pandas as pd
+
+# Preprocessing
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LassoCV
-from sklearn.impute import SimpleImputer
+
+# Models
 from sklearn.linear_model import Lasso
+from sklearn.svm import LinearSVR
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.neural_network import MLPRegressor
+
+# Metrics
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 ##################################################
@@ -151,9 +160,6 @@ for name, coef in selected_features:
 # --- 4. Random forest ------
 #############################
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
 rf_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
     ("model", RandomForestRegressor(
@@ -196,7 +202,7 @@ print('Classification accuracy on test is: {}'.format(rf_pipeline.score(X_test, 
 # --- 5. Grandient Boosting -----
 #################################
 
-from sklearn.ensemble import GradientBoostingRegressor
+
 
 gb_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
@@ -234,8 +240,6 @@ print(f"R² test    : {test_r2_gb:.3f}")
 ##################################
 # --- 6. Réseaux de neurones ---
 ##################################
-
-from sklearn.neural_network import MLPRegressor
 
 #mlp_pipeline = Pipeline(steps=[
 #    ("preprocess", preprocess),
@@ -300,9 +304,6 @@ print(f"[MLP] R² test    : {test_r2_mlp:.3f}")
 # --- 7. SVM/SVR ---
 ####################
 
-from sklearn.svm import SVR
-from sklearn.svm import LinearSVR
-
 svr_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
     ("model", LinearSVR(C=1.0, epsilon=1.0, random_state=0))
@@ -341,12 +342,6 @@ print('Classification accuracy on test is: {}'.format(svr_pipeline.score(X_test,
 ################################
 # --- 8. SVR Validation croisée
 ################################
-
-import numpy as np
-from sklearn.svm import LinearSVR
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # 1. Pipeline de base (tu gardes ton preprocess tel quel)
 svr_pipeline = Pipeline(steps=[
@@ -405,12 +400,6 @@ print(f"R² test    : {test_r2:.3f}")
 #######################################
 # --- 9. Lasso et cross validation ---
 #######################################
-
-import numpy as np
-from sklearn.linear_model import Lasso
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # 1. Pipeline de base
 lasso = Lasso(max_iter=10000)  # on ne fixe plus alpha ici
@@ -471,8 +460,6 @@ print(f"R² test    : {test_r2:.3f}")
 
 # Beaucoup trop lent sur la taille de notre base 
 
-from sklearn.neighbors import KNeighborsRegressor
-
 knn_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
     ("model", KNeighborsRegressor(n_neighbors=10))
@@ -498,4 +485,3 @@ print(f"MAE train  : {train_mae_knn:.2f}")
 print(f"MAE test   : {test_mae_knn:.2f}")
 print(f"R² train   : {train_r2_knn:.3f}")
 print(f"R² test    : {test_r2_knn:.3f}")
-

@@ -1,12 +1,18 @@
-import pandas as pd
+# Core
 import numpy as np
+import pandas as pd
+
+# Preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LassoCV
-from sklearn.impute import SimpleImputer
+
+# Models
 from sklearn.linear_model import Lasso
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+
+# Metrics
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 ##################################################
@@ -148,9 +154,6 @@ for name, coef in selected_features:
 # --- 4. Random forest ------
 #############################
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
 rf_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
     ("model", RandomForestRegressor(
@@ -189,8 +192,6 @@ print(f"R² test    : {test_r2_rf:.3f}")
 #################################
 # --- 5. Grandient Boosting -----
 #################################
-
-from sklearn.ensemble import GradientBoostingRegressor
 
 gb_pipeline = Pipeline(steps=[
     ("preprocess", preprocess),
