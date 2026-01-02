@@ -22,10 +22,10 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 # --- 1. Préparation des Données et Variables ---
 ##################################################
 
-# Variables à retirer du jeu de données final
+# Variables supplémentaires à retirer du jeu de données final
 vars_inutiles_delai_ouverture = [
     "COMM",
-    "DEP_CODE",
+    "REG_CODE",
     "REG_LIBELLE",
     "DEP_LIBELLE",
     "NUM_DAU",
@@ -43,49 +43,75 @@ vars_inutiles_delai_ouverture = [
 
 # Variables à traiter en One-Hot Encoding
 vars_categ = [
-    "REG_CODE",
-    "TYPE_DAU",
-    "ETAT_DAU",
+    "DEP_CODE", 
+    "TYPE_DAU", 
+    "ETAT_DAU", 
     "CAT_DEM",
     "ZONE_OP",
     "NATURE_PROJET_DECLAREE",
     "UTILISATION",
     "RES_PRINCIP_OU_SECOND",
     "TYP_ANNEXE",
-    "RESIDENCE"]
+    "RESIDENCE" ]
 
-df = pd.read_csv("data/output.csv", sep=";")
-#print(df.head())
-#df.columns
+df = pd.read_csv("data/autorisations_enrichies.csv", sep=";")
 
 # Filtrage des régions et des années
 regions_outremer = [
     "Guadeloupe", "Martinique", "Guyane",
     "La Réunion", "Mayotte"
 ]
+
+# Il faut remettre en format date : il faudrait sauver le type dans le chargement des données
 df["DATE_REELLE_AUTORISATION"] = pd.to_datetime(df["DATE_REELLE_AUTORISATION"], errors="coerce")
 df["annee_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.year
+df["mois_autorisation"] = df["DATE_REELLE_AUTORISATION"].dt.month
 
 # Filtrage des lignes sans la variable cible
 df_filtre_delai_ouverture = df.dropna(subset=["delai_ouverture_chantier"])
-df_filtre_delai_ouverture = df_filtre_delai_ouverture[~df["REG_LIBELLE"].isin(regions_outremer)]
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[
+    ~df_filtre_delai_ouverture["REG_LIBELLE"].isin(regions_outremer)
+]
 #df = df[df["annee_autorisation"] >= 2020]
 df_filtre_delai_ouverture = df_filtre_delai_ouverture[(df_filtre_delai_ouverture["annee_autorisation"] >= 2015) & (df_filtre_delai_ouverture["annee_autorisation"] <= 2019)]
 df_filtre_delai_ouverture = df_filtre_delai_ouverture[df_filtre_delai_ouverture["delai_ouverture_chantier"] <= 600]
-df_filtre_delai_ouverture = df_filtre_delai_ouverture[df_filtre_delai_ouverture["ETAT_DAU"] != 4]
+df_filtre_delai_ouverture = df_filtre_delai_ouverture[df_filtre_delai_ouverture["ETAT_DAU"] != 4] #on retire les annulations
 
 # Nettoyage et conversion des types sur l'échantillon
 df_filtre_delai_ouverture = df_filtre_delai_ouverture.drop(columns=vars_inutiles_delai_ouverture, errors="ignore")
-df_filtre_delai_ouverture[vars_categ] = df_filtre_delai_ouverture[vars_categ].astype("string").fillna("Missing")
-#df_filtre_delai_ouverture.isna().any().any() Pas de NA
 
-# Définition des variables X et y
-y = df_filtre_delai_ouverture["delai_ouverture_chantier"]
-X = df_filtre_delai_ouverture.drop(columns=["delai_ouverture_chantier"])
+# Gestion des NA ((ATTETION, A JUSTIFIER))
+# df_filtre_delai_ouverture[vars_categ] = df_filtre_delai_ouverture[vars_categ].astype("string").fillna("Missing")
 
-# Séparation des colonnes numériques et catégorielles après nettoyage
-num_cols = X.select_dtypes(include=["float", "int", "bool"]).columns
-cat_cols = X.select_dtypes(include=["string"]).columns
+# Suppression des lignes sans variable cible
+df_model = df_filtre_delai_ouverture.dropna(subset=["delai_ouverture_chantier"])
+
+# On définit X et y
+y = df_model["delai_ouverture_chantier"]
+X = df_model.drop(columns=["delai_ouverture_chantier"])
+
+# Colonnes numériques
+num_cols = X.select_dtypes(
+    include=["float", "int", "bool"]
+).columns.tolist()
+
+# Colonnes catégorielles
+cat_cols = X.select_dtypes(
+    include=["string"]
+).columns.tolist()
+
+# On gère les NAs des variables explicatives
+cols_utiles = num_cols + cat_cols
+n_before_na = len(X)
+# Suppression des lignes avec NA sur les variables explicatives
+X = X.dropna(subset=cols_utiles)
+y = y.loc[X.index] 
+
+n_after_na = len(X)
+drop_rate = 100 * (1 - n_after_na / n_before_na)
+
+print(f"[INFO] Observations après filtrage NA : {n_after_na:,}")
+print(f"[INFO] Taux de suppression des observations : {drop_rate:.2f}%")
 
 #####################################################
 # --- 2. Création du Pipeline de Pré-traitement -----
@@ -98,7 +124,7 @@ preprocess = ColumnTransformer(
         # Encodage One-Hot des variables catégorielles (handle_unknown='ignore' pour les valeurs futures non vues)
         ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
     ],
-    remainder='passthrough' # Ne rien faire avec les colonnes restantes
+    remainder='drop' # On jette ce qui reste
 )
 
 X_train, X_test, y_train, y_test = train_test_split(
@@ -155,6 +181,35 @@ nonzero_idx = coefs != 0
 selected_features = [(name, coef) for name, coef in zip(feature_names, coefs) if coef != 0]
 for name, coef in selected_features:
     print(f"{name}: {coef:.4f}")
+
+## Essayons une version en log 
+y_log = np.log1p(y)
+
+X_train2, X_test2, y_train2, y_test2 = train_test_split(
+    X, y_log,
+    test_size=0.2,
+    random_state=42
+)
+
+lasso_log = Lasso(alpha=0.1, max_iter=10_000)
+
+lasso_log_pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", lasso_log)
+])
+lasso_log_pipeline.fit(X_train2, y_train2)
+
+y_train_log_pred = lasso_log_pipeline.predict(X_train2)
+y_test_log_pred = lasso_log_pipeline.predict(X_test2)
+
+train_r2_log = r2_score(y_train2, y_train_log_pred)
+test_r2_log = r2_score(y_test2, y_test_log_pred)
+
+print("\n[LASSO – log(durée + 1)]")
+print(f"R² train   : {train_r2_log:.3f}")
+print(f"R² test    : {test_r2_log:.3f}")
+
+
 
 #############################
 # --- 4. Random forest ------
