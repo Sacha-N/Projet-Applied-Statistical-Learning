@@ -54,7 +54,7 @@ vars_categ = [
     "TYP_ANNEXE",
     "RESIDENCE" ]
 
-df = pd.read_csv("data/autorisations_enrichies.csv", sep=";")
+df = pd.read_csv("data/autorisations.csv", sep=";")
 
 # Filtrage des régions et des années
 regions_outremer = [

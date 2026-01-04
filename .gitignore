@@ -5,6 +5,7 @@ __pycache__/
 
 # Data 
 *.csv
+*.parquet
 # C extensions
 *.so
 
